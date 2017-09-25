@@ -27,6 +27,11 @@ type ErrorInfo struct {
 	Reason string
 }
 
+type StatusInfo struct {
+	Ip     string
+	Status bool
+}
+
 type App struct {
 	*revel.Controller
 }
@@ -107,4 +112,22 @@ func (c App) Deploy() revel.Result {
 		errInfos = append(errInfos, ErrorInfo{Ip: results[0], Reason: results[1]})
 	}
 	return c.RenderJson(WSSuccess{Status: 200, Data: errInfos})
+}
+
+func (c App) Status() revel.Result {
+	if c.Params.Form.Get("group") == "" || c.Params.Form.Get("command") == "" {
+		return c.RenderJson(WSError{Status: 500, Error: "input can't be null"})
+	}
+	regexp, err := regexp.Compile("(\\d+\\.\\d+\\.\\d+\\.\\d+) \\| (SUCCESS|FAILED)")
+	if err != nil {
+		return c.RenderJson(WSError{Status: 500, Error: err.Error()})
+	}
+	cmd := exec.Command("/bin/bash", "-c", "ansible "+c.Params.Form.Get("group")+" -m shell -a \"ps -C "+c.Params.Form.Get("command")+"\"")
+	result, _ := cmd.Output()
+	status := make([]StatusInfo, 0)
+	for _, value := range regexp.FindAllString(string(result), -1) {
+		results := strings.Split(regexp.ReplaceAllString(value, "$1"+split+"$2"), split)
+		status = append(status, StatusInfo{Ip: results[0], Status: (results[1] == "SUCCESS")})
+	}
+	return c.RenderJson(WSSuccess{Status: 200, Data: status})
 }
