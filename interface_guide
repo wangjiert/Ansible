@@ -1,0 +1,6 @@
+ GET 	ansible/filelist
+ GET 	ansible/filecontent         filename
+ POST	ansible/alter				filename,filecontent
+ POST	ansible/deploy				filename
+ POST	ansible/status				group,service
+ POST	ansible/restart				ip,service

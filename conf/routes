@@ -4,14 +4,10 @@
 
 module:testrunner
 
-GET     /                                       App.Index
+GET     /                                       Ansible.Index
 
 # Ignore favicon requests
 GET     /favicon.ico                            404
-GET		/index									App.FileList
-GET		/file									App.OpenFile
-POST	/alter									App.Alter
-POST	/deploy									App.Deploy
 # Map static resources from the /app/public folder to the /public path
 GET     /public/*filepath                       Static.Serve("public")
 

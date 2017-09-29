@@ -32,17 +32,17 @@ type StatusInfo struct {
 	Status bool
 }
 
-type App struct {
+type Ansible struct {
 	*revel.Controller
 }
 
 var rootPath = "/home/revel/config/"
 
-func (c App) Index() revel.Result {
+func (c Ansible) Index() revel.Result {
 	return c.Render()
 }
 
-func (c App) FileList() revel.Result {
+func (c Ansible) FileList() revel.Result {
 	files, err := ioutil.ReadDir(rootPath)
 	if err != nil {
 		c.RenderJson(WSError{Status: 500, Error: err.Error()})
@@ -56,7 +56,7 @@ func (c App) FileList() revel.Result {
 	return c.RenderJson(WSSuccess{Status: 200, Data: fileList})
 }
 
-func (c App) OpenFile() revel.Result {
+func (c Ansible) FileContent() revel.Result {
 	filename := c.Params.Query.Get("filename")
 	if filename == "hosts" {
 		filename = "/etc/ansible/hosts"
@@ -76,7 +76,7 @@ func (c App) OpenFile() revel.Result {
 	return c.RenderJson(WSSuccess{Status: 200, Data: fileContent})
 }
 
-func (c App) Alter() revel.Result {
+func (c Ansible) Alter() revel.Result {
 	var filePath string
 	if c.Params.Form.Get("filename") == "hosts" {
 		filePath = "/etc/ansible/hosts"
@@ -94,7 +94,7 @@ func (c App) Alter() revel.Result {
 	return c.RenderJson(WSSuccess{Status: 200, Data: "OK"})
 }
 
-func (c App) Deploy() revel.Result {
+func (c Ansible) Deploy() revel.Result {
 	regexp, err := regexp.Compile("fatal: \\[(\\d+\\.\\d+\\.\\d+\\.\\d+)\\](?:.*)\"msg\": \"([^\"]*)\"")
 	if err != nil {
 		return c.RenderJson(WSError{Status: 500, Error: err.Error()})
@@ -114,15 +114,15 @@ func (c App) Deploy() revel.Result {
 	return c.RenderJson(WSSuccess{Status: 200, Data: errInfos})
 }
 
-func (c App) Status() revel.Result {
-	if c.Params.Form.Get("group") == "" || c.Params.Form.Get("command") == "" {
+func (c Ansible) Status() revel.Result {
+	if c.Params.Form.Get("group") == "" || c.Params.Form.Get("service") == "" {
 		return c.RenderJson(WSError{Status: 500, Error: "input can't be null"})
 	}
 	regexp, err := regexp.Compile("(\\d+\\.\\d+\\.\\d+\\.\\d+) \\| (SUCCESS|FAILED)")
 	if err != nil {
 		return c.RenderJson(WSError{Status: 500, Error: err.Error()})
 	}
-	cmd := exec.Command("/bin/bash", "-c", "ansible "+c.Params.Form.Get("group")+" -m shell -a \"ps -C "+c.Params.Form.Get("command")+"\"")
+	cmd := exec.Command("/bin/bash", "-c", "ansible "+c.Params.Form.Get("group")+" -m shell -a \"ps -C "+c.Params.Form.Get("service")+"\"")
 	result, _ := cmd.Output()
 	status := make([]StatusInfo, 0)
 	for _, value := range regexp.FindAllString(string(result), -1) {
@@ -130,4 +130,16 @@ func (c App) Status() revel.Result {
 		status = append(status, StatusInfo{Ip: results[0], Status: (results[1] == "SUCCESS")})
 	}
 	return c.RenderJson(WSSuccess{Status: 200, Data: status})
+}
+
+func (c Ansible) Restart() revel.Result {
+	if c.Params.Form.Get("ip") == "" || c.Params.Form.Get("service") == "" {
+		return c.RenderJson(WSError{Status: 500, Error: "input can't be null"})
+	}
+	if c.Params.Form.Get("service") == "Web" {
+		c.Params.Form.Set("service", "gorevel")
+	}
+	cmd := exec.Command("/bin/bash", "-c", "ansible "+c.Params.Form.Get("ip")+" -m service -a \"name="+c.Params.Form.Get("service")+" state=restarted\" --become")
+	result, _ := cmd.Output()
+	return c.RenderJson(WSSuccess{Status: 200, Data: strings.Contains(string(result), "SUCCESS")})
 }
